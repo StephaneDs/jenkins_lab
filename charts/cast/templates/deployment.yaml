@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cast.fullname" . }}
+  labels:
+    {{- include "cast.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "cast.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cast.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+
+          env:
+            - name: DB_HOST
+              value: "cast-db-postgresql.{{ .Release.Namespace }}.svc.cluster.local"
+  
+            - name: DATABASE_URI
+              valueFrom:
+                secretKeyRef:
+                  name: {{ printf "%s-%s" .Values.db.secretName .Release.Namespace }} 
+                  key: {{ .Values.db.secretKey }}
+  
+            - name: LOG_LEVEL
+              value: "{{ .Values.env.LOG_LEVEL | default "INFO" }}"          
+
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}

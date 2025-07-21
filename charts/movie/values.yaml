@@ -1,0 +1,44 @@
+replicaCount: 1
+
+image:
+  repository: belka75/movie-svc
+  tag: v2
+  pullPolicy: IfNotPresent
+
+service:
+  type: NodePort
+  port: 8000
+
+env:
+  DB_HOST: "movie-db-postgresql.app-dev.svc.cluster.local"
+  CAST_SERVICE_HOST_URL: "http://cast:8000/api/v1/casts/"
+  LOG_LEVEL: "DEBUG" 
+
+db:
+  user: movie_user
+  password: movie_password
+  namePrefix: movie_db_
+  secretName: movie-db-postgresql
+  secretKey: connection-string
+
+
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8000
+  initialDelaySeconds: 30 

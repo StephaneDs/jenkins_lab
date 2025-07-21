@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-db-init
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "5"
+spec:
+  template:
+    spec:
+      containers:
+        - name: init
+          image: postgres:12.1-alpine 
+          env:
+            - name: PGHOST
+              value: "cast-db-postgresql.{{ .Release.Namespace }}.svc"
+            - name: PGUSER
+              value: "{{ .Values.db.user }}" 
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ printf "%s-%s" .Values.db.secretName .Release.Namespace }}
+                  key: {{ .Values.db.secretKey }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              DB_NAME="{{ printf "%s%s" .Values.db.namePrefix .Release.Namespace }}"
+
+              echo "Creating DB $DB_NAME if it doesn't exist..."
+
+              until pg_isready -h $PGHOST -U $PGUSER; do sleep 5; done
+
+              psql -h $PGHOST -U $PGUSER -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1 || \
+              psql -h $PGHOST -U $PGUSER -d postgres -c "CREATE DATABASE $DB_NAME;"
+
+              psql -h $PGHOST -U $PGUSER -d $DB_NAME -c "CREATE TABLE IF NOT EXISTS casts (
+                id SERIAL PRIMARY KEY,
+                full_name VARCHAR(100) NOT NULL,
+                gender VARCHAR(10),
+                nationality VARCHAR(50)
+              );"
+
+              echo "Initialisation terminée avec succès"
+      restartPolicy: Never
