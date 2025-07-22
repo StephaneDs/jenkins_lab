@@ -26,8 +26,14 @@ pipeline {
     stage('Build Docker Images') {
       steps {
         script {
-          docker.build("movie-svc:${TAG}", 'movie-service')
-          docker.build("cast-svc:${TAG}", 'cast-service')
+          def movieImage = docker.build("${IMAGE_MOVIE}:${TAG}", 'movie-service')
+          def castImage = docker.build("${IMAGE_CAST}:${TAG}", 'cast-service')
+
+          echo "Image Movie créée avec ID: ${movieImage.id()}"
+          echo "Image Cast créée avec ID: ${castImage.id()}"
+
+          env.MOVIE_IMAGE_TAGGED = "${IMAGE_MOVIE}:${TAG}"
+          env.CAST_IMAGE_TAGGED = "${IMAGE_CAST}:${TAG}"
         }
       }
     }
@@ -36,8 +42,11 @@ pipeline {
       steps {
         withDockerRegistry([ credentialsId: 'DOCKER_HUB_CREDENTIAL', url: '' ]) {
           script {
-            docker.image("movie-svc:${TAG}").push()
-            docker.image("cast-svc:${TAG}").push()
+            def movieImage = docker.image(env.MOVIE_IMAGE_TAGGED)
+            def castImage = docker.image(env.CAST_IMAGE_TAGGED)
+
+            movieImage.push()
+            castImage.push()
           }
         }
       }
@@ -46,7 +55,6 @@ pipeline {
     stage('Deploy to Kubernetes') {
       when {
         expression {
-          // deploy all exept "master"
           return env.BRANCH_NAME != 'master'
         }
       }
@@ -72,7 +80,7 @@ pipeline {
         branch 'master'
       }
       steps {
-        input message: 'would you like to deploy in prod ?'
+        input message: 'Would you like to deploy in production?'
       }
     }
 
@@ -100,10 +108,10 @@ pipeline {
 
   post {
     success {
-      echo "deployment successful for ${env.BRANCH_NAME}"
+      echo "Deployment successful for ${env.BRANCH_NAME}"
     }
     failure {
-      echo " pipeline failed"
+      echo "Pipeline failed"
     }
     always {
       sh 'docker system prune -f'
