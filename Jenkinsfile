@@ -33,8 +33,8 @@ pipeline {
           def movieImage = docker.build("${movieImageName}:${tag}", 'movie-service')
           def castImage = docker.build("${castImageName}:${tag}", 'cast-service')
 
-          echo "movie image created with ID: ${movieImage.id()}"
-          echo "cast imge created with ID: ${castImage.id()}"
+          echo "movie image created with ID: ${env.MOVIE_IMAGE_TAGGED}"
+          echo "cast imge created with ID: ${env.CAST_IMAGE_NAME}"
 
           env.MOVIE_IMAGE_TAGGED = "${movieImageName}:${tag}"
           env.CAST_IMAGE_TAGGED = "${castImageName}:${tag}"
