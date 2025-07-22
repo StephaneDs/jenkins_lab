@@ -26,14 +26,18 @@ pipeline {
     stage('Build Docker Images') {
       steps {
         script {
-          def movieImage = docker.build("${IMAGE_MOVIE}:${TAG}", 'movie-service')
-          def castImage = docker.build("${IMAGE_CAST}:${TAG}", 'cast-service')
+          def movieImageName = env.IMAGE_MOVIE
+          def castImageName = env.IMAGE_CAST
+          def tag = env.TAG
 
-          echo "Image Movie créée avec ID: ${movieImage.id()}"
-          echo "Image Cast créée avec ID: ${castImage.id()}"
+          def movieImage = docker.build("${movieImageName}:${tag}", 'movie-service')
+          def castImage = docker.build("${castImageName}:${tag}", 'cast-service')
 
-          env.MOVIE_IMAGE_TAGGED = "${IMAGE_MOVIE}:${TAG}"
-          env.CAST_IMAGE_TAGGED = "${IMAGE_CAST}:${TAG}"
+          echo "movie image created with ID: ${movieImage.id()}"
+          echo "cast imge created with ID: ${castImage.id()}"
+
+          env.MOVIE_IMAGE_TAGGED = "${movieImageName}:${tag}"
+          env.CAST_IMAGE_TAGGED = "${castImageName}:${tag}"
         }
       }
     }
@@ -44,8 +48,11 @@ pipeline {
           script {
             def movieImage = docker.image(env.MOVIE_IMAGE_TAGGED)
             def castImage = docker.image(env.CAST_IMAGE_TAGGED)
+            
 
+            echo"pushing ${env.MOVIE_IMAGE_TAGGED} to docker"
             movieImage.push()
+            echo"pushing ${env.CAST_IMAGE_TAGGED} to docker"
             castImage.push()
           }
         }
