@@ -44,7 +44,7 @@ pipeline {
 
     stage('Push to DockerHub') {
       steps {
-        withDockerRegistry([ credentialsId: 'DOCKER_HUB_CREDENTIAL', url: '' ]) {
+        withDockerRegistry([ credentialsId: 'DOCKER_HUB_CREDENTIAL', url: 'https://index.docker.io/v1/' ]) {
           script {
             def movieImage = docker.image(env.MOVIE_IMAGE_TAGGED)
             def castImage = docker.image(env.CAST_IMAGE_TAGGED)
