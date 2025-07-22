@@ -71,16 +71,17 @@ pipeline {
         withCredentials([file(credentialsId: 'KUBECONFIG_FILE', variable: 'KUBECONFIG')]) {
           script {
             sh """
+              set -eux
               export KUBECONFIG=$KUBECONFIG
 
-              helm upgrade --install movie ${CHART_PATH_MOVIE} \
-                --namespace ${NAMESPACE} --create-namespace \
-                --set image.repository=${IMAGE_MOVIE} \
+              helm upgrade --install movie ${CHART_PATH_MOVIE} \\
+                --namespace ${NAMESPACE} --create-namespace \\
+                --set image.repository=${IMAGE_MOVIE} \\
                 --set image.tag=${TAG}
 
-              helm upgrade --install cast ${CHART_PATH_CAST} \
-                --namespace ${NAMESPACE} --create-namespace \
-                --set image.repository=${IMAGE_CAST} \
+              helm upgrade --install cast ${CHART_PATH_CAST} \\
+                --namespace ${NAMESPACE} --create-namespace \\
+                --set image.repository=${IMAGE_CAST} \\
                 --set image.tag=${TAG}
             """
           }
@@ -93,7 +94,7 @@ pipeline {
         branch 'master'
       }
       steps {
-        input message: 'would you like to deploy in production?'
+        input message: 'Would you like to deploy in production?'
       }
     }
 
@@ -105,16 +106,17 @@ pipeline {
         withCredentials([file(credentialsId: 'KUBECONFIG_FILE', variable: 'KUBECONFIG')]) {
           script {
             sh """
+              set -eux
               export KUBECONFIG=$KUBECONFIG
 
-              helm upgrade --install movie ${CHART_PATH_MOVIE} \
-                --namespace prod --create-namespace \
-                --set image.repository=${IMAGE_MOVIE} \
+              helm upgrade --install movie ${CHART_PATH_MOVIE} \\
+                --namespace prod --create-namespace \\
+                --set image.repository=${IMAGE_MOVIE} \\
                 --set image.tag=${TAG}
 
-              helm upgrade --install cast ${CHART_PATH_CAST} \
-                --namespace prod --create-namespace \
-                --set image.repository=${IMAGE_CAST} \
+              helm upgrade --install cast ${CHART_PATH_CAST} \\
+                --namespace prod --create-namespace \\
+                --set image.repository=${IMAGE_CAST} \\
                 --set image.tag=${TAG}
             """
           }
@@ -125,10 +127,10 @@ pipeline {
 
   post {
     success {
-      echo "deployment successful for ${env.BRANCH_NAME}"
+      echo "Deployment successful for ${env.BRANCH_NAME}"
     }
     failure {
-      echo "pipeline failed"
+      echo "Pipeline failed"
     }
     always {
       sh 'docker system prune -f'
