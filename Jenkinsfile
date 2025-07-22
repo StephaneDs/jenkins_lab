@@ -68,7 +68,7 @@ pipeline {
         }
       }
       steps {
-        withCredentials([file(credentialsId: 'KUBECONFIG_FILE', variable: 'KUBECONFIG')]) {
+        withCredentials([file(credentialsId: 'config', variable: 'KUBECONFIG')]) {
           script {
             sh """
               set -eux
