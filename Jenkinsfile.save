@@ -33,28 +33,26 @@ pipeline {
           def movieImage = docker.build("${movieImageName}:${tag}", 'movie-service')
           def castImage = docker.build("${castImageName}:${tag}", 'cast-service')
 
-          // Enregistrement des noms complets
+          echo "movie image created with ID: ${env.MOVIE_IMAGE_TAGGED}"
+          echo "cast imge created with ID: ${env.CAST_IMAGE_NAME}"
+
           env.MOVIE_IMAGE_TAGGED = "${movieImageName}:${tag}"
           env.CAST_IMAGE_TAGGED = "${castImageName}:${tag}"
-
-          // Confirmation visuelle
-          echo "Movie image built: ${env.MOVIE_IMAGE_TAGGED}"
-          echo "Cast image built: ${env.CAST_IMAGE_TAGGED}"
         }
       }
     }
 
     stage('Push to DockerHub') {
       steps {
-        withDockerRegistry([credentialsId: 'DOCKER_HUB_CREDENTIAL', url: 'https://index.docker.io/v1/']) {
+        withDockerRegistry([ credentialsId: 'DOCKER_HUB_CREDENTIAL', url: 'https://index.docker.io/v1/' ]) {
           script {
             def movieImage = docker.image(env.MOVIE_IMAGE_TAGGED)
             def castImage = docker.image(env.CAST_IMAGE_TAGGED)
+            
 
-            echo "Pushing ${env.MOVIE_IMAGE_TAGGED} to Docker Hub"
+            echo"pushing ${env.MOVIE_IMAGE_TAGGED} to docker"
             movieImage.push()
-
-            echo "Pushing ${env.CAST_IMAGE_TAGGED} to Docker Hub"
+            echo"pushing ${env.CAST_IMAGE_TAGGED} to docker"
             castImage.push()
           }
         }
@@ -68,10 +66,11 @@ pipeline {
         }
       }
       steps {
-        withCredentials([file(credentialsId: 'KUBECONFIG_FILE', variable: 'KUBECONFIG')]) {
+        withCredentials([file(credentialsId: 'KUBECONFIG_FILE', variable: 'KUBECONFIG')]){
           script {
             sh """
-              export KUBECONFIG=$KUBECONFIG
+
+              export KUBECONFIG=$KUBECONFIG              
 
               helm upgrade --install movie ${CHART_PATH_MOVIE} \
                 --namespace ${NAMESPACE} --create-namespace \
@@ -87,13 +86,12 @@ pipeline {
         }
       }
     }
-
     stage('manual approval for production') {
       when {
         branch 'master'
       }
       steps {
-        input message: 'would you like to deploy in production?'
+        input message: 'Would you like to deploy in production?'
       }
     }
 
@@ -102,22 +100,18 @@ pipeline {
         branch 'master'
       }
       steps {
-        withCredentials([file(credentialsId: 'KUBECONFIG_FILE', variable: 'KUBECONFIG')]) {
-          script {
-            sh """
-              export KUBECONFIG=$KUBECONFIG
+        script {
+          sh """
+            helm upgrade --install movie ${CHART_PATH_MOVIE} \
+              --namespace prod --create-namespace \
+              --set image.repository=${IMAGE_MOVIE} \
+              --set image.tag=${TAG}
 
-              helm upgrade --install movie ${CHART_PATH_MOVIE} \
-                --namespace prod --create-namespace \
-                --set image.repository=${IMAGE_MOVIE} \
-                --set image.tag=${TAG}
-
-              helm upgrade --install cast ${CHART_PATH_CAST} \
-                --namespace prod --create-namespace \
-                --set image.repository=${IMAGE_CAST} \
-                --set image.tag=${TAG}
-            """
-          }
+            helm upgrade --install cast ${CHART_PATH_CAST} \
+              --namespace prod --create-namespace \
+              --set image.repository=${IMAGE_CAST} \
+              --set image.tag=${TAG}
+          """
         }
       }
     }
@@ -125,10 +119,10 @@ pipeline {
 
   post {
     success {
-      echo "deployment successful for ${env.BRANCH_NAME}"
+      echo "Deployment successful for ${env.BRANCH_NAME}"
     }
     failure {
-      echo "pipeline failed"
+      echo "Pipeline failed"
     }
     always {
       sh 'docker system prune -f'
