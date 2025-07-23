@@ -3,49 +3,41 @@ kind: Job
 metadata:
   name: {{ .Release.Name }}-db-init
   annotations:
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
-    "helm.sh/hook-weight": "5"
+    "helm.sh/hook": post-install
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
 spec:
   template:
     spec:
+      restartPolicy: Never
       containers:
       - name: init
-        image: postgres:12.1-alpine 
+        image: postgres:12.1-alpine
         env:
         - name: PGHOST
           value: "movie-db-postgresql.{{ .Release.Namespace }}.svc"
         - name: PGUSER
-          value: "{{ .Values.db.user }}" 
+          value: "{{ .Values.db.user }}"
         - name: PGPASSWORD
           valueFrom:
             secretKeyRef:
               name: {{ printf "%s-%s" .Values.db.secretName .Release.Namespace }}
-              key: {{ .Values.db.secretKey }} 
+              key: {{ .Values.db.secretKey }}
         command: ["/bin/sh", "-c"]
-
-
         args:
           - |
-
             DB_NAME="{{ printf "%s%s" .Values.db.namePrefix .Release.Namespace }}"
+            echo "Checking DB existence..."
             
-            echo "creating db $DB_NAME if doesnt exist"
+            timeout 60s bash -c 'until pg_isready -h $PGHOST -U $PGUSER; do sleep 5; done' || {
+              echo "Database not ready after 60s, skipping init"
+              exit 0
+            }
 
-            until pg_isready -h $PGHOST -U $PGUSER; do sleep 5; done
+            EXISTS=$(psql -h $PGHOST -U $PGUSER -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'")
+            if [ "$EXISTS" = "1" ]; then
+              echo "DB $DB_NAME already exists, skipping init"
+              exit 0
+            fi
 
-            psql -h $PGHOST -U $PGUSER -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1 || \
+            echo "Creating DB $DB_NAME..."
             psql -h $PGHOST -U $PGUSER -d postgres -c "CREATE DATABASE $DB_NAME;"
-            
-
-            psql -h $PGHOST -U $PGUSER -d $DB_NAME -c "CREATE TABLE IF NOT EXISTS movies (
-              id SERIAL PRIMARY KEY,
-              name VARCHAR(50) NOT NULL,
-              plot VARCHAR(250),
-              genres TEXT[],
-              casts_id INTEGER[]
-            );"
-
-
-            echo "initialisation terminée avec succès"
-      restartPolicy: Never
