@@ -3,42 +3,45 @@ kind: Job
 metadata:
   name: {{ .Release.Name }}-db-init
   annotations:
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
-    "helm.sh/hook-weight": "5"
+    "helm.sh/hook": post-install
+    "helm.sh/hook-delete-policy": hook-succeeded,hook-failed
 spec:
+  backoffLimit: 1
   template:
     spec:
-      containers:
-        - name: init
-          image: postgres:12.1-alpine 
-          env:
-            - name: PGHOST
-              value: "cast-db-postgresql.{{ .Release.Namespace }}.svc"
-            - name: PGUSER
-              value: "{{ .Values.db.user }}" 
-            - name: PGPASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ printf "%s-%s" .Values.db.secretName .Release.Namespace }}
-                  key: {{ .Values.db.secretKey }}
-          command: ["/bin/sh", "-c"]
-          args:
-            - |
-              DB_NAME="{{ printf "%s%s" .Values.db.namePrefix .Release.Namespace }}"
-
-              echo "Creating DB $DB_NAME if it doesn't exist..."
-
-              until pg_isready -h $PGHOST -U $PGUSER; do sleep 5; done
-
-              psql -h $PGHOST -U $PGUSER -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1 || \
-              psql -h $PGHOST -U $PGUSER -d postgres -c "CREATE DATABASE $DB_NAME;"
-
-              psql -h $PGHOST -U $PGUSER -d $DB_NAME -c "CREATE TABLE IF NOT EXISTS casts (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(100) NOT NULL,
-                nationality VARCHAR(50)
-              );"
-
-              echo "Initialisation terminée avec succès"
       restartPolicy: Never
+      containers:
+      - name: init
+        image: postgres:12.1-alpine
+        env:
+        - name: PGHOST
+          value: "{{ .Release.Name }}-db-postgresql.{{ .Release.Namespace }}.svc"
+        - name: PGUSER
+          value: "{{ .Values.db.user }}"
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-db-postgresql
+              key: postgresql-password
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            set -e
+            DB_NAME="{{ printf "%s%s" .Values.db.namePrefix .Release.Namespace }}"
+            echo "Waiting for PostgreSQL..."
+            if ! timeout 60s bash -c 'until pg_isready -h $PGHOST -U $PGUSER; do sleep 5; done'; then
+              echo "DB not ready after 60s, skipping init."
+              exit 0
+            fi
+
+            echo "Checking if $DB_NAME exists..."
+            EXISTS=$(psql -h $PGHOST -U $PGUSER -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | xargs)
+            if [ "$EXISTS" = "1" ]; then
+              echo "DB $DB_NAME already exists, skipping init."
+              exit 0
+            fi
+
+            echo "Creating DB $DB_NAME..."
+            psql -h $PGHOST -U $PGUSER -d postgres -c "CREATE DATABASE \"$DB_NAME\";"
+            echo "DB created successfully"
+            exit 0
