@@ -30,8 +30,8 @@ pipeline {
           def castImageName = env.IMAGE_CAST
           def tag = env.TAG
 
-          def movieImage = docker.build("${movieImageName}:${tag}", 'movie-service')
-          def castImage = docker.build("${castImageName}:${tag}", 'cast-service')
+          def movieImage = docker.build("${movieImageName}:${tag}", "--label ci.tool=jenkins --label ci.job=${env.JOB_NAME} --label ci.build=${env.BUILD_NUMBER} movie-service")
+          def castImage = docker.build("${castImageName}:${tag}", "--label ci.tool=jenkins --label ci.job=${env.JOB_NAME} --label ci.build=${env.BUILD_NUMBER} cast-service")
 
           // Enregistrement des noms complets
           env.MOVIE_IMAGE_TAGGED = "${movieImageName}:${tag}"
