@@ -33,7 +33,6 @@ pipeline {
           def movieImage = docker.build("${movieImageName}:${tag}", "--label ci.tool=jenkins --label ci.job=${env.JOB_NAME} --label ci.build=${env.BUILD_NUMBER} movie-service")
           def castImage = docker.build("${castImageName}:${tag}", "--label ci.tool=jenkins --label ci.job=${env.JOB_NAME} --label ci.build=${env.BUILD_NUMBER} cast-service")
 
-          // full_name
           env.MOVIE_IMAGE_TAGGED = "${movieImageName}:${tag}"
           env.CAST_IMAGE_TAGGED = "${castImageName}:${tag}"
 
@@ -55,6 +54,35 @@ pipeline {
 
             echo "pushing ${env.CAST_IMAGE_TAGGED} to docker hub"
             castImage.push()
+          }
+        }
+      }
+    }
+
+    stage('deploy databases') {
+      steps {
+        withCredentials([file(credentialsId: 'config', variable: 'KUBECONFIG')]) {
+          script {
+            sh """
+              set -eux
+              export KUBECONFIG=$KUBECONFIG
+
+              echo "Deploying PostgreSQL databases for namespace ${NAMESPACE}..."
+
+              helm upgrade --install movie-db bitnami/postgresql \\
+                --namespace ${NAMESPACE} --create-namespace \\
+                --set auth.username=movie_user \\
+                --set auth.password=movie_password \\
+                --set auth.database=movie_db
+
+              helm upgrade --install cast-db bitnami/postgresql \\
+                --namespace ${NAMESPACE} \\
+                --set auth.username=cast_user \\
+                --set auth.password=cast_password \\
+                --set auth.database=cast_db
+
+              echo "Databases deployed successfully!"
+            """
           }
         }
       }
@@ -82,27 +110,6 @@ pipeline {
                 --namespace ${NAMESPACE} --create-namespace \\
                 --set image.repository=${IMAGE_CAST} \\
                 --set image.tag=${TAG}
-            """
-          }
-        }
-      }
-    }
-
-    stage('check deployment') {
-      steps {
-        withCredentials([file(credentialsId: 'config', variable: 'KUBECONFIG')]) {
-          script {
-            sh """
-              set -eux
-              export KUBECONFIG=$KUBECONFIG
-
-              echo "checking rollout status deployments in namespace ${NAMESPACE}..."
-              kubectl rollout status deployment/movie-svc -n ${NAMESPACE} --timeout=120s
-              kubectl rollout status deployment/cast-svc -n ${NAMESPACE} --timeout=120s
-
-              echo "deployments are running!"
-              echo "current pods status:"
-              kubectl get pods -n ${NAMESPACE}
             """
           }
         }
