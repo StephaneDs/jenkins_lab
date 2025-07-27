@@ -10,18 +10,14 @@ service:
   port: 8000
 
 env:
-  DB_HOST: "movie-db-postgresql.app-dev.svc.cluster.local"
-  CAST_SERVICE_HOST_URL: "http://cast:8000/api/v1/casts/"
   LOG_LEVEL: "DEBUG" 
 
 db:
   user: movie_user
-  password: movie_password
-  namePrefix: movie_db_
   secretName: movie-db-postgresql
-  secretKey: connection-string
+  name: movie_db
 
-
+castServicePath: "/api/v1/casts/"
 
 autoscaling:
   enabled: false

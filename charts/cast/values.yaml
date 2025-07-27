@@ -10,16 +10,12 @@ service:
   port: 8000                  
 
 env:
-  DB_HOST: "cast-db-postgresql.app-dev.svc.cluster.local"
   LOG_LEVEL: "DEBUG"
 
 db:
   user: cast_user
-  password: cast_password
-  namePrefix: cast_db_
   secretName: cast-db-postgresql
-  secretKey: connection-string
-
+  name: cast_db
 
 resources:
   requests:
