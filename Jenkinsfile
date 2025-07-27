@@ -17,13 +17,13 @@ pipeline {
 
   stages {
 
-    stage('Checkout') {
+    stage('checkout') {
       steps {
         checkout scm
       }
     }
 
-    stage('Build Docker Images') {
+    stage('build docker images') {
       steps {
         script {
           def movieImageName = env.IMAGE_MOVIE
@@ -33,35 +33,34 @@ pipeline {
           def movieImage = docker.build("${movieImageName}:${tag}", "--label ci.tool=jenkins --label ci.job=${env.JOB_NAME} --label ci.build=${env.BUILD_NUMBER} movie-service")
           def castImage = docker.build("${castImageName}:${tag}", "--label ci.tool=jenkins --label ci.job=${env.JOB_NAME} --label ci.build=${env.BUILD_NUMBER} cast-service")
 
-          // Enregistrement des noms complets
+          // full_name
           env.MOVIE_IMAGE_TAGGED = "${movieImageName}:${tag}"
           env.CAST_IMAGE_TAGGED = "${castImageName}:${tag}"
 
-          // Confirmation visuelle
           echo "Movie image built: ${env.MOVIE_IMAGE_TAGGED}"
           echo "Cast image built: ${env.CAST_IMAGE_TAGGED}"
         }
       }
     }
 
-    stage('Push to DockerHub') {
+    stage('push to dockerHub') {
       steps {
         withDockerRegistry([credentialsId: 'DOCKER_HUB_CREDENTIAL', url: 'https://index.docker.io/v1/']) {
           script {
             def movieImage = docker.image(env.MOVIE_IMAGE_TAGGED)
             def castImage = docker.image(env.CAST_IMAGE_TAGGED)
 
-            echo "Pushing ${env.MOVIE_IMAGE_TAGGED} to Docker Hub"
+            echo "pushing ${env.MOVIE_IMAGE_TAGGED} to Docker Hub"
             movieImage.push()
 
-            echo "Pushing ${env.CAST_IMAGE_TAGGED} to Docker Hub"
+            echo "pushing ${env.CAST_IMAGE_TAGGED} to docker hub"
             castImage.push()
           }
         }
       }
     }
 
-    stage('Deploy to Kubernetes') {
+    stage('deploy to kubernetes') {
       when {
         expression {
           return env.BRANCH_NAME != 'master'
@@ -83,6 +82,27 @@ pipeline {
                 --namespace ${NAMESPACE} --create-namespace \\
                 --set image.repository=${IMAGE_CAST} \\
                 --set image.tag=${TAG}
+            """
+          }
+        }
+      }
+    }
+
+    stage('check deployment') {
+      steps {
+        withCredentials([file(credentialsId: 'config', variable: 'KUBECONFIG')]) {
+          script {
+            sh """
+              set -eux
+              export KUBECONFIG=$KUBECONFIG
+
+              echo "checking rollout status deployments in namespace ${NAMESPACE}..."
+              kubectl rollout status deployment/movie-svc -n ${NAMESPACE} --timeout=120s
+              kubectl rollout status deployment/cast-svc -n ${NAMESPACE} --timeout=120s
+
+              echo "deployments are running!"
+              echo "current pods status:"
+              kubectl get pods -n ${NAMESPACE}
             """
           }
         }
