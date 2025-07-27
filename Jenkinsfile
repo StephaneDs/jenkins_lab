@@ -67,7 +67,11 @@ pipeline {
               set -eux
               export KUBECONFIG=$KUBECONFIG
 
-              echo "Deploying PostgreSQL databases for namespace ${NAMESPACE}..."
+              helm repo add bitnami https://charts.bitnami.com/bitnami
+              helm repo update
+
+
+              echo "Deploying postgreSQL databases for namespace ${NAMESPACE}..."
 
               helm upgrade --install movie-db bitnami/postgresql \\
                 --namespace ${NAMESPACE} --create-namespace \\
@@ -81,7 +85,7 @@ pipeline {
                 --set auth.password=cast_password \\
                 --set auth.database=cast_db
 
-              echo "Databases deployed successfully!"
+              echo "databases deployed successfully!"
             """
           }
         }
